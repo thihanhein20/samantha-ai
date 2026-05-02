@@ -1,10 +1,15 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
-import LoginPage from "@/app/auth/login/page";
+import AppShell from "@/components/AppShell";
 
-export default async function HomePage() {
+export default async function AppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const session = await getServerSession(authOptions);
-  if (!session) return <LoginPage />;
-  redirect("/dashboard");
+  if (!session) redirect("/");
+
+  return <AppShell>{children}</AppShell>;
 }

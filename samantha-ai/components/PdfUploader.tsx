@@ -1,12 +1,11 @@
 "use client";
 import { Dispatch, SetStateAction, useState, useEffect, useRef } from "react";
-import { Upload } from "lucide-react";
+import { Upload, RotateCcw, BookOpen } from "lucide-react";
 import DocumentLibraryModal from "./DocumentModal/DocumentModal";
 
 interface PdfUploadColumnProps {
   setPdfBuffer: Dispatch<SetStateAction<ArrayBuffer | null>>;
   setPdfUrl: Dispatch<SetStateAction<string | null>>;
-
   onUploadComplete: (fileUrl: string, s3key: string, file_name: string) => void;
   onDocumentSelected: (docData: any) => void;
   isExtracting: boolean;
@@ -25,12 +24,21 @@ export default function PdfUploader({
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showLibrary, setShowLibrary] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
+  const handleDragLeave = () => setIsDragging(false);
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file?.type === "application/pdf") setPdfFile(file);
+  };
 
   const handleUpload = async () => {
     if (!pdfFile) return;
     setLoading(true);
-
     try {
       const arrayBuffer = await pdfFile.arrayBuffer();
       setPdfBuffer(arrayBuffer);
@@ -46,7 +54,7 @@ export default function PdfUploader({
 
       onUploadComplete(data.fileUrl, data.s3key, pdfFile.name);
     } catch (err) {
-      alert("Upload failed: " + "He He");
+      alert("Upload failed: " + (err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -55,24 +63,15 @@ export default function PdfUploader({
   const handleSelectFromLibrary = async (doc: any) => {
     try {
       const fileUrl = `/api/files/${encodeURIComponent(doc.s3_key)}`;
-
-      // Show PDF
       setPdfPreviewUrl(fileUrl);
       setPdfUrl(fileUrl);
       setPdfFile(null);
 
-      // Fetch full document info
       const res = await fetch(`/api/documents/${doc.id}`);
       if (!res.ok) throw new Error("Failed to fetch document data");
 
       const documentData = await res.json();
-
-      onDocumentSelected({
-        ...documentData,
-        pdf_s3_key: doc.s3_key,
-        pdf_file_name: doc.file_name,
-      });
-
+      onDocumentSelected({ ...documentData, pdf_s3_key: doc.s3_key, pdf_file_name: doc.file_name });
       setShowLibrary(false);
     } catch (err) {
       console.error(err);
@@ -85,35 +84,37 @@ export default function PdfUploader({
     const url = URL.createObjectURL(pdfFile);
     setPdfPreviewUrl(url);
     setPdfUrl(url);
-
     return () => URL.revokeObjectURL(url);
   }, [pdfFile, setPdfUrl]);
 
+  const isProcessing = loading || isExtracting;
+
   return (
-    <div className="md:w-1/2 bg-white p-6 rounded-2xl shadow-lg space-y-4">
-      <div className="flex items-center gap-3">
-        <h2 className="text-xl font-bold text-gray-800">Upload PDF</h2>
+    <div className="md:w-1/2 bg-white p-5 rounded-2xl shadow-lg flex flex-col gap-4">
+      {/* Toolbar */}
+      <div className="flex items-center gap-2">
+        <h2 className="text-lg font-bold text-gray-900 mr-auto">Upload PDF</h2>
+
         <button
           onClick={() => {
             setPdfFile(null);
             setPdfPreviewUrl(null);
             setPdfUrl(null);
-            if (onReset) onReset(); // <-- reset parent form
+            if (onReset) onReset();
           }}
-          className="ml-2 px-4 py-2 rounded-xl bg-gray-200 text-gray-700 hover:bg-gray-300"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition"
         >
+          <RotateCcw size={14} />
           Reset
         </button>
+
         <button
           onClick={handleUpload}
-          disabled={!pdfFile || loading || isExtracting}
-          className="ml-auto bg-gradient-to-r from-blue-600 to-cyan-400 text-white px-5 py-2 rounded-xl hover:bg-blue-700 disabled:opacity-50"
+          disabled={!pdfFile || isProcessing}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-cyan-400 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all"
         >
-          {loading
-            ? "Uploading..."
-            : isExtracting
-              ? "Extracting..."
-              : "Upload & Extract"}
+          <Upload size={14} />
+          {loading ? "Uploading…" : isExtracting ? "Extracting…" : "Upload & Extract"}
         </button>
       </div>
 
@@ -121,57 +122,53 @@ export default function PdfUploader({
         ref={fileInputRef}
         type="file"
         accept="application/pdf"
-        onChange={(e) => {
-          if (e.target.files?.[0]) setPdfFile(e.target.files[0]);
-        }}
+        onChange={(e) => { if (e.target.files?.[0]) setPdfFile(e.target.files[0]); }}
         className="hidden"
       />
 
-      <div className="relative">
+      {/* Drop zone / preview */}
+      <div className="relative flex-1">
         {!pdfPreviewUrl ? (
-          <div className="h-[30rem] border-2 border-dashed border-blue-300 bg-blue-50 rounded-2xl flex flex-col items-center justify-center gap-4">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-100 text-blue-700 hover:bg-blue-200"
-            >
-              <Upload size={18} />
-              <span>Select PDF</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowLibrary(true)}
-              className="text-sm text-blue-700 underline hover:text-blue-900"
-            >
-              Choose from Document Library
-            </button>
-
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`w-full h-[30rem] border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-4 transition-all group ${
+              isDragging
+                ? "border-blue-500 bg-blue-100 scale-[1.01]"
+                : "border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 hover:border-blue-400 hover:from-blue-100 hover:to-cyan-100"
+            }`}
+          >
+            <div className="w-16 h-16 rounded-2xl bg-white shadow-sm flex items-center justify-center group-hover:scale-105 transition-transform">
+              <Upload size={26} className="text-blue-500" />
+            </div>
+            <div className="text-center">
+              <p className="font-semibold text-gray-700">
+                {isDragging ? "Drop to upload" : "Click or drag & drop a PDF"}
+              </p>
+              <p className="text-sm text-gray-400 mt-1">or browse your document library</p>
+            </div>
             {pdfFile && (
-              <div className="absolute top-2 left-2 px-2 py-1 bg-blue-100 text-blue-700 text-sm rounded border border-dashed border-blue-300">
+              <span className="absolute top-3 left-3 px-3 py-1 bg-white border border-blue-200 text-blue-700 text-xs font-medium rounded-lg shadow-sm">
                 {pdfFile.name}
-              </div>
+              </span>
             )}
-          </div>
+          </button>
         ) : (
-          <div className="relative h-[30rem] border rounded-2xl overflow-hidden shadow-inner">
-            <embed
-              src={pdfPreviewUrl}
-              type="application/pdf"
-              width="100%"
-              height="100%"
-            />
-
-            <div className="absolute top-2 right-2 flex gap-2">
+          <div className="relative h-[30rem] border border-gray-200 rounded-2xl overflow-hidden shadow-inner">
+            <embed src={pdfPreviewUrl} type="application/pdf" width="100%" height="100%" />
+            <div className="absolute top-2 right-2 flex gap-1.5">
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200"
+                className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 shadow-sm transition"
               >
-                Replace PDF
+                Replace
               </button>
               <button
                 onClick={() => setShowLibrary(true)}
-                className="px-3 py-1 bg-white border text-sm rounded hover:bg-gray-100"
+                className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 shadow-sm transition"
               >
                 Library
               </button>
@@ -180,11 +177,20 @@ export default function PdfUploader({
         )}
       </div>
 
+      {/* Library link when no file selected */}
+      {!pdfPreviewUrl && (
+        <button
+          type="button"
+          onClick={() => setShowLibrary(true)}
+          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition"
+        >
+          <BookOpen size={15} />
+          Choose from Document Library
+        </button>
+      )}
+
       {showLibrary && (
-        <DocumentLibraryModal
-          onClose={() => setShowLibrary(false)}
-          onSelect={handleSelectFromLibrary}
-        />
+        <DocumentLibraryModal onClose={() => setShowLibrary(false)} onSelect={handleSelectFromLibrary} />
       )}
     </div>
   );

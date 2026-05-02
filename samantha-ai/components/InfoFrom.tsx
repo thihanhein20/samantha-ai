@@ -9,6 +9,11 @@ interface InfoFormColumnProps {
   isEditMode: boolean;
 }
 
+const inputBase =
+  "border border-gray-200 p-3 rounded-xl w-full text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent";
+const inputActive = "bg-gray-50 hover:border-gray-300 focus:bg-white";
+const inputDisabled = "bg-gray-50 text-gray-400 cursor-not-allowed";
+
 export default function InfoFormColumn({
   data,
   setData,
@@ -36,29 +41,20 @@ export default function InfoFormColumn({
   const gpRef = useRef<HTMLDivElement | null>(null);
   const patientRef = useRef<HTMLDivElement | null>(null);
   const categoryRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        patientRef.current &&
-        !patientRef.current.contains(event.target as Node)
-      ) {
+      if (patientRef.current && !patientRef.current.contains(event.target as Node))
         setShowPatientDropdown(false);
-      }
-      if (
-        categoryRef.current &&
-        !categoryRef.current.contains(event.target as Node)
-      ) {
+      if (categoryRef.current && !categoryRef.current.contains(event.target as Node))
         setShowCategoryDropdown(false);
-      }
-      if (gpRef.current && !gpRef.current.contains(event.target as Node)) {
+      if (gpRef.current && !gpRef.current.contains(event.target as Node))
         setShowDoctorDropDown(false);
-      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Fetch patients & categories
   useEffect(() => {
     const fetchPatients = async () => {
       const res = await fetch("/api/patients");
@@ -80,16 +76,13 @@ export default function InfoFormColumn({
     fetchDoctors();
   }, []);
 
-  // Sync search inputs
   useEffect(() => {
     if (data.patient_name) setSearchPatient(data.patient_name);
     if (data.category) setSearchCategory(data.category);
     if (data.doctors) setSearchDoctor(data.gp_doctor);
   }, [data.patient_name, data.category, data.gp_doctor]);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setData({ ...data, [e.target.name]: e.target.value });
   };
 
@@ -99,7 +92,6 @@ export default function InfoFormColumn({
   const filteredCategories = categories.filter((c) =>
     c.name.toLowerCase().includes(searchCategory.toLowerCase()),
   );
-
   const filteredGp = doctors.filter((g) =>
     g.doctor_name.toLowerCase().includes(searchDoctor.toLowerCase()),
   );
@@ -109,253 +101,230 @@ export default function InfoFormColumn({
     setSearchPatient(p.full_name);
     setShowPatientDropdown(false);
   };
-
   const selectCategory = (c: any) => {
     setData({ ...data, category: c.name, category_id: c.id });
     setSearchCategory(c.name);
     setShowCategoryDropdown(false);
   };
-
   const selectDoctors = (d: any) => {
-    // setData({ ...data, doctor: d.doctor });
-    // setSearchDoctor(d.doctor_name);
-    // setShowDoctorDropDown(false);
-    setSearchDoctor(d.doctor_name); // input box
-    setData({ ...data, gp_doctor: d.doctor_name }); // main data
+    setSearchDoctor(d.doctor_name);
+    setData({ ...data, gp_doctor: d.doctor_name });
     setShowDoctorDropDown(false);
   };
 
-  // Decide if category dropdown should go above
   useEffect(() => {
     if (!showCategoryDropdown || !categoryRef.current) return;
     const rect = categoryRef.current.getBoundingClientRect();
-    const windowHeight = window.innerHeight;
-    setCategoryDropdownUp(rect.bottom + 200 > windowHeight); // 200px = dropdown height
+    setCategoryDropdownUp(rect.bottom + 200 > window.innerHeight);
   }, [showCategoryDropdown]);
+
+  const dropdownList =
+    "absolute z-20 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto mt-1";
+  const dropdownItem =
+    "px-4 py-2.5 hover:bg-blue-50 hover:text-blue-700 cursor-pointer text-sm transition-colors";
 
   return (
     <div
       ref={containerRef}
-      className="md:w-3/4 bg-white text-black p-6 rounded-2xl shadow-lg space-y-6 max-h-screen overflow-y-auto"
+      className="md:w-3/4 bg-white text-black p-6 rounded-2xl shadow-lg space-y-5 max-h-screen overflow-y-auto"
     >
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-2xl font-bold">Document Info</h2>
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 pb-1 border-b border-gray-100">
+        <h2 className="text-xl font-bold text-gray-900">Document Info</h2>
         <button
           type="button"
           onClick={onSave}
           disabled={!isExtracted}
-          className={`px-6 py-3 rounded-2xl text-white transition ${
+          className={`px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all ${
             !isExtracted
-              ? "bg-gray-400 cursor-not-allowed"
-              : isEditMode
-                ? "bg-gradient-to-r from-blue-600 to-cyan-400 "
-                : "bg-gradient-to-r from-blue-600 to-cyan-400  "
+              ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+              : "bg-gradient-to-r from-blue-600 to-cyan-400 hover:opacity-90 shadow-sm hover:shadow-md"
           }`}
         >
-          {isEditMode ? "Update Document" : "Save / Submit"}
+          {isEditMode ? "Update Document" : "Save & Submit"}
         </button>
       </div>
 
-      {/* Two-column grid for Prefix + Patient Name */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block mb-1 font-medium">Prefix</label>
-          <input
-            type="text"
-            name="prefix"
-            placeholder="Prefix"
-            value={data.prefix || ""}
-            onChange={handleChange}
-            disabled={!isExtracted}
-            className={`border border-gray-300 p-3 rounded-xl w-full focus:outline-none focus:ring-2 focus:ring-green-400 ${
-              !isExtracted ? "bg-gray-100 cursor-not-allowed" : ""
-            }`}
-          />
-        </div>
-
-        <div ref={patientRef} className="relative">
-          <label className="block mb-1 font-medium">Patient Name</label>
-          <input
-            type="text"
-            value={searchPatient}
-            onChange={(e) => {
-              setSearchPatient(e.target.value);
-              setShowPatientDropdown(true);
-            }}
-            onFocus={() => setShowPatientDropdown(true)}
-            placeholder="Search patient..."
-            disabled={!isExtracted}
-            className={`border border-gray-300 p-3 rounded-xl w-full focus:outline-none focus:ring-2 focus:ring-green-400 ${
-              !isExtracted ? "bg-gray-100 cursor-not-allowed" : ""
-            }`}
-          />
-          {showPatientDropdown && (
-            <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-xl shadow max-h-48 overflow-y-auto mt-1">
-              {filteredPatients.length > 0 ? (
-                filteredPatients.map((p) => (
-                  <div
-                    key={p.id}
-                    onClick={() => selectPatient(p)}
-                    className="p-3 hover:bg-green-100 cursor-pointer rounded-xl"
-                  >
-                    {p.full_name}
-                  </div>
-                ))
-              ) : (
-                <div className="p-3 text-gray-500">No patients found</div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block mb-1 font-medium">Date of Report</label>
-          <input
-            type="date"
-            name="date_of_report"
-            value={data.date_of_report || ""}
-            onChange={handleChange}
-            disabled={!isExtracted}
-            className={`border border-gray-300 p-3 rounded-xl w-full focus:outline-none focus:ring-2 focus:ring-green-400 ${
-              !isExtracted ? "bg-gray-100 cursor-not-allowed" : ""
-            }`}
-          />
-        </div>
-        <div>
-          <label className="block mb-1 font-medium">Document Subject</label>
-          <input
-            type="text"
-            name="document_subject"
-            value={data.document_subject || ""}
-            onChange={handleChange}
-            disabled={!isExtracted}
-            className={`border border-gray-300 p-3 rounded-xl w-full focus:outline-none focus:ring-2 focus:ring-green-400 ${
-              !isExtracted ? "bg-gray-100 cursor-not-allowed" : ""
-            }`}
-          />
-        </div>
-      </div>
-
-      {/* Source Contact + Store In */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block mb-1 font-medium">Source Contact</label>
-          <input
-            type="text"
-            name="source_contact"
-            value={data.source_contact || ""}
-            onChange={handleChange}
-            disabled={!isExtracted}
-            className={`border border-gray-300 p-3 rounded-xl w-full focus:outline-none focus:ring-2 focus:ring-green-400 ${
-              !isExtracted ? "bg-gray-100 cursor-not-allowed" : ""
-            }`}
-          />
-        </div>
-        <div>
-          <label className="block mb-1 font-medium">Store In</label>
-          <select
-            name="store_in"
-            value={data.store_in || storeIn}
-            onChange={(e) => {
-              setStoreIn(e.target.value);
-              setData({ ...data, store_in: e.target.value });
-            }}
-            disabled={!isExtracted}
-            className={`border border-gray-300 p-3 rounded-xl w-full focus:outline-none focus:ring-2 focus:ring-green-400 ${
-              !isExtracted ? "bg-gray-100 cursor-not-allowed" : ""
-            }`}
-          >
-            <option value="Correspondence">Correspondence</option>
-            <option value="Investigations">Investigations</option>
-          </select>
-        </div>
-      </div>
-
-      {/* GP Doctor + Category */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* GP Doctor */}
-        <div ref={gpRef}>
-          <div className="relative w-full">
-            <label className="block mb-1 font-medium">GP Doctor</label>
+      {/* Patient */}
+      <div>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          Patient
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block mb-1.5 text-sm font-medium text-gray-700">Prefix</label>
             <input
               type="text"
-              name="gp_doctor"
-              value={searchDoctor || data.gp_doctor || ""}
-              onChange={(e) => {
-                setSearchDoctor(e.target.value);
-                setData({ ...data, gp_doctor: e.target.value });
-                setShowDoctorDropDown(true);
-              }}
+              name="prefix"
+              placeholder="e.g. Mr, Mrs"
+              value={data.prefix || ""}
+              onChange={handleChange}
               disabled={!isExtracted}
-              onFocus={() => setShowDoctorDropDown(true)}
-              placeholder="Search GP Doctor..."
-              className={`w-full border border-gray-300 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 transition-colors ${
-                !isExtracted ? "bg-gray-100 cursor-not-allowed" : "bg-white"
-              }`}
+              className={`${inputBase} ${!isExtracted ? inputDisabled : inputActive}`}
             />
-            {showDoctorDropDown && isExtracted && (
-              <div className="absolute z-20 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto mt-1 sm:text-sm">
-                {filteredGp.length > 0 ? (
-                  filteredGp.map((g, index) => (
-                    <div
-                      key={index}
-                      onClick={() => selectDoctors(g)}
-                      className="px-4 py-3 hover:bg-green-100 cursor-pointer transition-colors"
-                    >
-                      {g.doctor_name}
+          </div>
+
+          <div ref={patientRef} className="relative">
+            <label className="block mb-1.5 text-sm font-medium text-gray-700">Patient Name</label>
+            <input
+              type="text"
+              value={searchPatient}
+              onChange={(e) => {
+                setSearchPatient(e.target.value);
+                setShowPatientDropdown(true);
+              }}
+              onFocus={() => setShowPatientDropdown(true)}
+              placeholder="Search patient..."
+              disabled={!isExtracted}
+              className={`${inputBase} ${!isExtracted ? inputDisabled : inputActive}`}
+            />
+            {showPatientDropdown && (
+              <div className={dropdownList}>
+                {filteredPatients.length > 0 ? (
+                  filteredPatients.map((p) => (
+                    <div key={p.id} onClick={() => selectPatient(p)} className={dropdownItem}>
+                      {p.full_name}
                     </div>
                   ))
                 ) : (
-                  <div className="px-4 py-3 text-gray-400">
-                    No GP Doctor found
-                  </div>
+                  <div className="px-4 py-2.5 text-sm text-gray-400">No patients found</div>
                 )}
               </div>
             )}
           </div>
         </div>
+      </div>
 
-        {/* Category */}
-        <div ref={categoryRef}>
-          <div className="relative w-full">
-            <label className="block mb-1 font-medium">Category</label>
+      {/* Document details */}
+      <div>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          Document Details
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block mb-1.5 text-sm font-medium text-gray-700">Date of Report</label>
+            <input
+              type="date"
+              name="date_of_report"
+              value={data.date_of_report || ""}
+              onChange={handleChange}
+              disabled={!isExtracted}
+              className={`${inputBase} ${!isExtracted ? inputDisabled : inputActive}`}
+            />
+          </div>
+          <div>
+            <label className="block mb-1.5 text-sm font-medium text-gray-700">Document Subject</label>
             <input
               type="text"
-              value={searchCategory}
-              onChange={(e) => {
-                setSearchCategory(e.target.value);
-                setShowCategoryDropdown(true);
-              }}
-              onFocus={() => setShowCategoryDropdown(true)}
-              placeholder="Search category..."
+              name="document_subject"
+              value={data.document_subject || ""}
+              onChange={handleChange}
               disabled={!isExtracted}
-              className={`border border-gray-300 p-3 rounded-xl w-full focus:outline-none focus:ring-2 focus:ring-green-400 ${
-                !isExtracted ? "bg-gray-100 cursor-not-allowed" : ""
-              }`}
+              placeholder="e.g. Blood Test Results"
+              className={`${inputBase} ${!isExtracted ? inputDisabled : inputActive}`}
             />
-            {showCategoryDropdown && (
-              <div
-                className={`absolute z-10 w-full bg-white border border-gray-200 rounded-xl shadow max-h-48 overflow-y-auto ${
-                  categoryDropdownUp ? "bottom-full mb-1" : "mt-1"
-                }`}
-              >
-                {filteredCategories.length > 0 ? (
-                  filteredCategories.map((c) => (
-                    <div
-                      key={c.id}
-                      onClick={() => selectCategory(c)}
-                      className="p-3 hover:bg-green-100 cursor-pointer rounded-xl"
-                    >
-                      {c.name}
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-3 text-gray-500">No categories found</div>
-                )}
-              </div>
-            )}
+          </div>
+          <div>
+            <label className="block mb-1.5 text-sm font-medium text-gray-700">Source Contact</label>
+            <input
+              type="text"
+              name="source_contact"
+              value={data.source_contact || ""}
+              onChange={handleChange}
+              disabled={!isExtracted}
+              placeholder="Hospital or clinic name"
+              className={`${inputBase} ${!isExtracted ? inputDisabled : inputActive}`}
+            />
+          </div>
+          <div>
+            <label className="block mb-1.5 text-sm font-medium text-gray-700">Store In</label>
+            <select
+              name="store_in"
+              value={data.store_in || storeIn}
+              onChange={(e) => {
+                setStoreIn(e.target.value);
+                setData({ ...data, store_in: e.target.value });
+              }}
+              disabled={!isExtracted}
+              className={`${inputBase} ${!isExtracted ? inputDisabled : inputActive}`}
+            >
+              <option value="Correspondence">Correspondence</option>
+              <option value="Investigations">Investigations</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Clinical */}
+      <div>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          Clinical
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div ref={gpRef}>
+            <label className="block mb-1.5 text-sm font-medium text-gray-700">GP Doctor</label>
+            <div className="relative">
+              <input
+                type="text"
+                name="gp_doctor"
+                value={searchDoctor || data.gp_doctor || ""}
+                onChange={(e) => {
+                  setSearchDoctor(e.target.value);
+                  setData({ ...data, gp_doctor: e.target.value });
+                  setShowDoctorDropDown(true);
+                }}
+                disabled={!isExtracted}
+                onFocus={() => setShowDoctorDropDown(true)}
+                placeholder="Search GP doctor..."
+                className={`${inputBase} ${!isExtracted ? inputDisabled : inputActive}`}
+              />
+              {showDoctorDropDown && isExtracted && (
+                <div className={dropdownList}>
+                  {filteredGp.length > 0 ? (
+                    filteredGp.map((g, i) => (
+                      <div key={i} onClick={() => selectDoctors(g)} className={dropdownItem}>
+                        {g.doctor_name}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-4 py-2.5 text-sm text-gray-400">No GP doctor found</div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div ref={categoryRef}>
+            <label className="block mb-1.5 text-sm font-medium text-gray-700">Category</label>
+            <div className="relative">
+              <input
+                type="text"
+                value={searchCategory}
+                onChange={(e) => {
+                  setSearchCategory(e.target.value);
+                  setShowCategoryDropdown(true);
+                }}
+                onFocus={() => setShowCategoryDropdown(true)}
+                placeholder="Search category..."
+                disabled={!isExtracted}
+                className={`${inputBase} ${!isExtracted ? inputDisabled : inputActive}`}
+              />
+              {showCategoryDropdown && (
+                <div
+                  className={`${dropdownList} ${categoryDropdownUp ? "bottom-full mb-1 mt-0" : ""}`}
+                >
+                  {filteredCategories.length > 0 ? (
+                    filteredCategories.map((c) => (
+                      <div key={c.id} onClick={() => selectCategory(c)} className={dropdownItem}>
+                        {c.name}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-4 py-2.5 text-sm text-gray-400">No categories found</div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
