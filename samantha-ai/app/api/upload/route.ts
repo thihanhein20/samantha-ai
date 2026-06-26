@@ -1,26 +1,11 @@
-// API route to upload a PDF to AWS S3: reads the file from the request,
-// uploads it to S3, and returns a signed URL for access
+// API route to upload a PDF to Supabase Storage: reads the file from the request,
+// uploads it, and returns a signed URL for access
 
 import { NextRequest, NextResponse } from "next/server";
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import "dotenv/config";
-
-const s3 = new S3Client({
-  region: process.env.NEXT_PUBLIC_AWS_REGION!,
-  credentials: {
-    accessKeyId: process.env.NEXT_PUBLIC_AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY!,
-  },
-});
+import { supabase } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
   try {
-    // Get filename from header
     const fileName = req.headers.get("x-filename");
     if (!fileName)
       return NextResponse.json(
@@ -28,41 +13,40 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
 
-    // Read PDF body as ArrayBuffer
     const pdfArrayBuffer = await req.arrayBuffer();
     if (!pdfArrayBuffer)
       return NextResponse.json({ error: "No file sent" }, { status: 400 });
 
     const key = `uploads/${Date.now()}-${fileName}`;
+    const bucket = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET!;
 
-    // Actually upload to S3
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: process.env.NEXT_PUBLIC_S3_BUCKET_NAME!,
-        Key: key,
-        Body: Buffer.from(pdfArrayBuffer),
-        ContentType: "application/pdf",
-      }),
-    );
+    // Create bucket if it doesn't exist yet
+    const { data: buckets } = await supabase.storage.listBuckets();
+    if (!buckets?.find((b) => b.name === bucket)) {
+      await supabase.storage.createBucket(bucket, { public: false });
+    }
 
-    // Generate signed URL
-    const signedUrl = await getSignedUrl(
-      s3,
-      new GetObjectCommand({
-        Bucket: process.env.NEXT_PUBLIC_S3_BUCKET_NAME!,
-        Key: key,
-      }),
-      { expiresIn: 3600 },
-    );
+    const { error: uploadError } = await supabase.storage
+      .from(bucket)
+      .upload(key, Buffer.from(pdfArrayBuffer), {
+        contentType: "application/pdf",
+        upsert: false,
+      });
 
-    console.log("Signed URL:", signedUrl);
+    if (uploadError) throw uploadError;
 
-    // Return to frontend
-    return NextResponse.json({ fileUrl: signedUrl, s3key: key });
+    const { data: signedUrlData, error: signedUrlError } =
+      await supabase.storage.from(bucket).createSignedUrl(key, 3600);
+
+    if (signedUrlError) throw signedUrlError;
+
+    console.log("Signed URL:", signedUrlData.signedUrl);
+
+    return NextResponse.json({ fileUrl: signedUrlData.signedUrl, s3key: key });
   } catch (err: any) {
-    console.error("S3 upload failed:", err);
+    console.error("Storage upload failed:", err);
     return NextResponse.json(
-      { error: "S3 upload failed", details: err.message },
+      { error: "Storage upload failed", details: err.message },
       { status: 500 },
     );
   }

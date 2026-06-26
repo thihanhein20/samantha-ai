@@ -10,9 +10,9 @@ export default function SignIn() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    fetch("/api/notify");
-  }, []);
+  // useEffect(() => {
+  //   fetch("/api/notify");
+  // }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,15 +28,17 @@ export default function SignIn() {
     setLoading(false);
 
     if (res?.error) {
+      console.log(res.error);
       setError("Invalid email or password");
     } else {
-      await fetch("/api/notify", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ action: "Clicked Button" }),
-      });
+      // await fetch("/api/notify", {
+      //   method: "POST",
+      //   headers: {
+      //     "Content-Type": "application/json",
+      //   },
+      //   body: JSON.stringify({ action: "Clicked Button" }),
+      // });
+
       window.location.href = "/";
     }
   };
